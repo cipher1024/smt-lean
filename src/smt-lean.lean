@@ -510,61 +510,61 @@ def parse_log (fn : string) :=
 do p ← io.fs.read_file fn,
    parser.run (parser.read_proof) p
 
-def foo_bar :=
-do h ← io.proc.spawn
-        { cmd := "veriT",
-          args := [
-                   -- "--proof-prune","--proof-merge","--proof-with-sharing",
-                           -- "--cnf-definitional","--disable-ackermann",
-                           -- "--disable-e",
-                           -- "--max-time=3",
-                           -- "--input=smtlib2",
-                           -- "--print-flat",
-                           -- "--disable-banner",
-                           -- "--print-simp-and-exit",
-                           "--proof=file.log"
-                             -- "--input=test.smt",
-                             -- "test.smt"
-                           ],
-          stdin := stdio.piped,
-          stdout := stdio.piped,
-          stderr := stdio.piped,
-          -- cwd := _,
-          -- env := _
-          },
-   -- xs ← buffer.to_string <$> io.fs.read_file "test.smt",
-   -- io.fs.put_str_ln h.stdin xs,
-   let xs := [ "; Integer arithmetic",
-               "(set-option :print-success false)",
-               "(set-option :produce-proofs true)",
-               "(set-logic QF_LIA)",
-               ";; (echo \"foo\")",
-               "(declare-fun x ( ) Int)",
-               "(declare-fun y ( ) Int)",
-               "(assert (! (= (- x y) (+ x (- y) 1)) :named h0))",
-               "(assert (= x y))",
-               "(check-sat)",
-               ";; (get-value ((x 0) (y 0) (x 1) (y 1)))",
-               ";; (get-model)",
-               "(get-proof)",
-               "; unsat",
-               ";; (exit)" ],
-   xs.mmap' (io.fs.put_str_ln h.stdin),
-   io.fs.close h.stdin,
-   -- dir ← io.env.get_cwd,
-   -- io.print $ dir.to_list,
-   -- io.put_str_ln h,
-   -- h' ← io.cmd { cmd := "pwd" },
-   -- io.put_str_ln h',
-   io.put_str_ln "stderr",
-   xs ← read_to_end h.stderr,
-   io.put_str_ln xs.to_string,
-   io.put_str_ln "stdout",
-   xs ← read_to_end h.stdout,
-   io.put_str_ln xs.to_string,
-   io.proc.wait h,
-   parse_log,
-   pure ()
+-- def foo_bar :=
+-- do h ← io.proc.spawn
+--         { cmd := "veriT",
+--           args := [
+--                    -- "--proof-prune","--proof-merge","--proof-with-sharing",
+--                            -- "--cnf-definitional","--disable-ackermann",
+--                            -- "--disable-e",
+--                            -- "--max-time=3",
+--                            -- "--input=smtlib2",
+--                            -- "--print-flat",
+--                            -- "--disable-banner",
+--                            -- "--print-simp-and-exit",
+--                            "--proof=file.log"
+--                              -- "--input=test.smt",
+--                              -- "test.smt"
+--                            ],
+--           stdin := stdio.piped,
+--           stdout := stdio.piped,
+--           stderr := stdio.piped,
+--           -- cwd := _,
+--           -- env := _
+--           },
+--    -- xs ← buffer.to_string <$> io.fs.read_file "test.smt",
+--    -- io.fs.put_str_ln h.stdin xs,
+--    let xs := [ "; Integer arithmetic",
+--                "(set-option :print-success false)",
+--                "(set-option :produce-proofs true)",
+--                "(set-logic QF_LIA)",
+--                ";; (echo \"foo\")",
+--                "(declare-fun x ( ) Int)",
+--                "(declare-fun y ( ) Int)",
+--                "(assert (! (= (- x y) (+ x (- y) 1)) :named h0))",
+--                "(assert (= x y))",
+--                "(check-sat)",
+--                ";; (get-value ((x 0) (y 0) (x 1) (y 1)))",
+--                ";; (get-model)",
+--                "(get-proof)",
+--                "; unsat",
+--                ";; (exit)" ],
+--    xs.mmap' (io.fs.put_str_ln h.stdin),
+--    io.fs.close h.stdin,
+--    -- dir ← io.env.get_cwd,
+--    -- io.print $ dir.to_list,
+--    -- io.put_str_ln h,
+--    -- h' ← io.cmd { cmd := "pwd" },
+--    -- io.put_str_ln h',
+--    io.put_str_ln "stderr",
+--    xs ← read_to_end h.stderr,
+--    io.put_str_ln xs.to_string,
+--    io.put_str_ln "stdout",
+--    xs ← read_to_end h.stdout,
+--    io.put_str_ln xs.to_string,
+--    io.proc.wait h,
+--    parse_log,
+--    pure ()
 
 -- run_cmd unsafe_run_io parse_log -- unsafe_run_io foo_bar
 
@@ -619,7 +619,6 @@ meta def expr.of_sexpr : sexpr → tactic expr
 | (fapp (const (sym "<=") :: [x,y])) := [x,y].mmap expr.of_sexpr >>= mk_app ``has_le.le
 | e@(fapp _) := fail format!"fapp {e.to_string}"
 
-#check @id
 
 meta def and_prj : ℕ → expr → expr → tactic expr
 | 0 `(%%p ∧ %%q) h :=
@@ -635,9 +634,6 @@ do -- ls ← ls.mmap get_local,
    hs ← local_context,
    hs.reverse.mmap $ λ h, try $ clear_lst [h.local_pp_name],
    intron n
-
-
-#print proof_step
 
 open native ( rb_map )
 meta def run_step (m : rb_map ℕ expr) : ℕ × proof_step → tactic (rb_map ℕ expr)
@@ -700,8 +696,7 @@ do ls ← native.rb_map.of_list <$>  proof_file_names.get_param ``proof_files,
    proof_file_names.set ``proof_files ls'.to_list tt,
    pure $ fn ++ "_" ++ to_string i ++ "." ++ ext
 
-meta def call_solver (xs : list string) : tactic string :=
-unique_file_name "log" >>= λ fn,
+meta def call_solver (fn : string) (xs : list string) : tactic string :=
 unsafe_run_io $
 do -- h ← mk_file_handle "text.smt" io.mode.write ff,
    -- close h,
@@ -728,9 +723,10 @@ do -- h ← mk_file_handle "text.smt" io.mode.write ff,
 meta def veriT : tactic unit :=
 do by_contradiction none,
    dedup,
+   fn ← unique_file_name "log",
    ls ← local_context,
    ps ← ls.mmap encode_local,
-   fn ← call_solver ps,
+   fn ← call_solver fn ps,
    p ← tactic.unsafe_run_io $ parse_log fn,
    mfoldl run_step (native.rb_map.mk _ _) p,
    pure ()
@@ -775,6 +771,3 @@ end
 -- begin
 --   veriT,
 -- end
-
-#check le_antisymm_iff
-#check 3
