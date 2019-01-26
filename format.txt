@@ -1,0 +1,171 @@
+veriT stable2016 - the SMT-solver veriT (UFRN/LORIA).
+The proof format is a sequence of lines
+    n:(type clause clause_ids params)
+where
+ - n is a number (starting from 1).  It is the identifier of the deduced clause
+ - type is a deduction type
+ - clause is a list (L1 ... Lm) of the literals in the clause
+ - clause_ids is a (possibly empty) sequence of clause identifiers
+ - params is a (possibly empty) sequence of integers.
+   The number of those (clause_ids and params) arguments depend on the type
+The following types are currently output
+ * input             : {input formula}
+ * deep_res          : deep resolution in formula
+ * true              : valid: {true}
+ * false             : valid: {(not false)}
+ * and_pos           : valid: {(not (and a_1 ... a_n)) a_i}
+ * and_neg           : valid: {(and a_1 ... a_n) (not a_1) ... (not a_n)}
+ * or_pos            : valid: {(not (or a_1 ... a_n)) a_1 ... a_n}
+ * or_neg            : valid: {(or a_1 ... a_n) (not a_i)}
+ * xor_pos1          : valid: {(not (xor a b)) a b}
+ * xor_pos2          : valid: {(not (xor a b)) (not a) (not b)}
+ * xor_neg1          : valid: {(xor a b) a (not b)}
+ * xor_neg2          : valid: {(xor a b) (not a) b}
+ * implies_pos       : valid: {(not (implies a b)) (not a) b}
+ * implies_neg1      : valid: {(implies a b) a}
+ * implies_neg2      : valid: {(implies a b) (not b)}
+ * equiv_pos1        : valid: {(not (iff a b)) a (not b)}
+ * equiv_pos2        : valid: {(not (iff a b)) (not a) b}
+ * equiv_neg1        : valid: {(iff a b) (not a) (not b)}
+ * equiv_neg2        : valid: {(iff a b) a b}
+ * ite_pos1          : valid: {(not (if_then_else a b c)) a c}
+ * ite_pos2          : valid: {(not (if_then_else a b c)) (not a) b}
+ * ite_neg1          : valid: {(if_then_else a b c) a (not c)}
+ * ite_neg2          : valid: {(if_then_else a b c) (not a) (not b)}
+ * eq_reflexive      : valid: {(= x x)}
+ * eq_transitive     : valid: {(not (= x_1 x_2)) ... (not (= x_{n-1} x_n)) (= x_1 x_n)}
+ * eq_congruent      : valid: {(not (= x_1 y_1)) ... (not (= x_n y_n)) (= (f x_1 ... x_n) (f y_1 ... y_n))}
+ * eq_congruent_pred : valid: {(not (= x_1 y_1)) ... (not (= x_n y_n)) (not (p x_1 ... x_n)) (p y_1 ... y_n)}
+ * eq_congruent_general : valid: {(not (= x_1 y_1)) ... (not (= x_n y_n)) (not (p t_1 ... x_1 ... t_m ... x_n)) (p t_1 ... y_1 ... t_m ... y_n)}
+ * distinct_elim     : valid: {(= DIST(...) ... neq ...)}
+ * chainable_elim    : valid: {(= (f t1 ... tn ) (and (f t1 t2 ) (f t2 t3 ) ... (f tn−1 tn ))}
+ * right_assoc_elim  : valid: {(= (f t1 ... tn ) (f t1 (f t2 ... (f tn−1 tn ) ... )}
+ * left_assoc_elim   : valid: {(= (f t1 ... tn ) (f ... (f (f t1 t2 ) t3 ) ... tn )}
+ * la_rw_eq          : valid: {(= (a = b) (and (a <= b) (b <= a))}
+ * la_generic        : valid: not yet defined
+ * lia_generic       : valid: not yet defined
+ * nla_generic       : valid: not yet defined
+ * la_disequality    : valid: not yet defined
+ * la_totality       : valid: {(le t1 t2), (le t2 t1)}
+ * la_tautology      : valid: linear arithmetic tautology without variable
+ * forall_inst       : valid: {(implies (forall X (A X)) (A {X \ t}))}
+ * exists_inst       : valid: {(implies (A t) (exists X (A {t \ X})))}
+ * skolem_ex_ax      : valid: {(not (exists X (A X))), A(sk)} where sk is fresh
+ * skolem_all_ax     : valid: {(not A(sk)), (forall X (A X))} where sk is fresh
+ * qnt_simplify_ax   : valid: to be defined
+ * qnt_merge_ax      : valid: {(not (Q x (Q y (F x y)))), (Q x y (F x y)))} where sk is fresh
+ * fol_ax            : valid: to be defined [produced by the E prover]
+ * th_resolution     : resolution of 2 or more clauses from theory reasoner
+ * resolution        : resolution of 2 or more clauses from SAT solver
+ * and               : {(and a_1 ... a_n)} --> {a_i}
+ * not_or            : {(not (or a_1 ... a_n))} --> {(not a_i)}
+ * or                : {(or a_1 ... a_n)} --> {a_1 ... a_n}
+ * not_and           : {(not (and a_1 ... a_n))} --> {(not a_1) ... (not a_n)}
+ * xor1              : {(xor a b)} --> {a b}
+ * xor2              : {(xor a b)} --> {(not a) (not b)}
+ * not_xor1          : {(not (xor a b))} --> {a (not b)}
+ * not_xor2          : {(not (xor a b))} --> {(not a) b}
+ * implies           : {(implies a b)} --> {(not a) b}
+ * not_implies1      : {(not (implies a b))} --> {a}
+ * not_implies2      : {(not (implies a b))} --> {(not b)}
+ * equiv1            : {(iff a b)} --> {(not a) b}
+ * equiv2            : {(iff a b)} --> {a (not b)}
+ * not_equiv1        : {(not (iff a b))} --> {a b}
+ * not_equiv2        : {(not (iff a b))} --> {(not a) (not b)}
+ * ite1              : {(if_then_else a b c)} --> {a c}
+ * ite2              : {(if_then_else a b c)} --> {(not a) b}
+ * not_ite1          : {(not (if_then_else a b c))} --> {a (not c)}
+ * not_ite2          : {(not (if_then_else a b c))} --> {(not a) (not b)}
+ * tmp_alphaconv     : {formula} --> {alpha conversion with fresh symbols}
+ * tmp_let_elim      : {formula} --> {formula where let have been eliminated}
+ * tmp_nary_elim     : {formula} --> {formula where n-ary symbols have been eliminated}
+ * tmp_distinct_elim : {formula} --> {formula where distinct have been eliminated}
+ * tmp_eq_norm       : {formula} --> {formula where eqs between propositions have been turned into equivs}
+ * tmp_simp_arith    : {formula} --> {formula where arith terms have been normalized}
+ * tmp_ite_elim      : {formula} --> {formula where ite terms have been eliminated}
+ * tmp_macrosubst    : {formula} --> {formula where macros have been substituted}
+ * tmp_betared       : {formula} --> {formula where beta reduction has been applied}
+ * tmp_bfun_elim     : {formula} --> {formula where functions with Boolean arguments have been simplified}
+ * tmp_sk_connector  : {formula} --> {formula where some connectors have been suppressed for skolemization}
+ * tmp_pm_process    : {formula} --> {formula where polymorphism has been eliminated}
+ * tmp_qnt_tidy      : {formula} --> {formula where quantifiers have been normalized}
+ * tmp_qnt_simplify  : {formula} --> {formula where quantifiers have been simplified}
+ * tmp_skolemize     : {formula} --> {Skolemized formula}
+ * tmp_LA_pre        : {formula} --> {formula with = replaced by conjunction of two inequalities}
+ * subproof          :
+The following deduction types require exactly one clause_id argument:
+ * and
+ * not_or
+ * or
+ * not_and
+ * xor1
+ * xor2
+ * not_xor1
+ * not_xor2
+ * implies
+ * not_implies1
+ * not_implies2
+ * equiv1
+ * equiv2
+ * not_equiv1
+ * not_equiv2
+ * ite1
+ * ite2
+ * not_ite1
+ * not_ite2
+ * tmp_alphaconv
+ * tmp_let_elim
+ * tmp_nary_elim
+ * tmp_distinct_elim
+ * tmp_eq_norm
+ * tmp_simp_arith
+ * tmp_ite_elim
+ * tmp_macrosubst
+ * tmp_betared
+ * tmp_bfun_elim
+ * tmp_sk_connector
+ * tmp_pm_process
+ * tmp_qnt_tidy
+ * tmp_qnt_simplify
+ * tmp_skolemize
+ * tmp_LA_pre
+ * subproof
+The following deduction types may have any number of clause_id arguments:
+ * deep_res
+ * th_resolution
+ * resolution
+The following deduction types require exactly one integer parameter:
+ * and_pos
+ * or_neg
+ * and
+ * not_or
+
+Please notice that
+ - double negations are silently simplified
+ - clauses are silently simplified to eliminate repeated literals
+ - clauses with complementary literals are silently simplified to true
+ - symmetry and reflexivity of equality is silently used
+
+Currently, QF_UF/QF_IDL/QF_RDL/QF_UFIDL are covered by proof production.
+Also notice that the fragments using difference logic (DL) may require
+preprocessing steps that are not proof producing.
+Formulas with quantifiers also require preprocessing steps
+that are not proof-producing.
+Skolemization is proof producing though.
+The user is responsible for providing an adequately written formula.
+
+Option --proof-with-sharing uses DAG sharing in the output proof.
+Every first occurrence of a term or formula (except negations and 0-ary terms and formulas)
+is written as #n:term, where n is its identifier.  Every later occurrence is simply #n
+Option --proof-prune eliminates every unused step in the proof.
+
+The following features will be implemented in the future:
+ - Eliminate similar deductions
+ - Output proof for full linear arithmetics
+ - Output proof for E-prover inferences (maybe?)
+The following features may be implemented if requested:
+ - Eliminate redundancy in the proof format
+ - Transform n-ary resolution to binary resolution
+ - Make symmetry, reflexivity of equality explicit
+ - Make double negation simplification explicit
+Invalid memory reference

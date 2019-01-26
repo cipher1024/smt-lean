@@ -1,0 +1,128 @@
+the veriT solver -- checking verification conditions with Theories.
+Version: stable2016
+Usage: veriT [OPTION...] FILENAME
+
+       --disable-sym-eq       Disable symmetry of equality (EXPERIMENTAL - don't
+                              use that)
+       --enable-deep-skolem   Enable deep Skolemization
+       --disable-simp-sym     Disable simplification for symmetries.
+       --disable-simp         Disable simplification of expressions.
+       --disable-unit-simp    Disable unit clause propagation as
+                              simplification.Only available in non-interactive
+                              mode
+       --disable-unit-subst-simp
+                              Disables unit clause rewriting as
+                              simplification.Only available in non-interactive
+                              mode
+       --disable-ackermann    Disable local Ackermannization and elimination of
+                              rare symbols.
+       --enable-assumption-simp
+                              Enable simplifications of assumptions
+       --enable-nnf-simp      Qnt formulas into NNF, with var renaming
+       --disable-bclause      Do not optimize for binary clauses.
+       --disable-pivot-heuristics
+                              disable variable selection heuristic for simplex
+                              pivoting
+       --disable-simp-const   Disable silent elimination of constant variables
+                              in simplex.
+       --disable-hw-int       Disable use of hardware integers for simplex.
+       --enable-lemmas-totality
+                              Generates lemmas based on the totality property.
+       --enable-arith-theory-propagation
+                              Arithmetic creates hints for the SAT solver.
+       --enable-lemmas-bounds Generates lemmas involving literals on arithmetic
+                              bounds.
+       --disable-bb-var-selection
+                              Disables branch-and-bound variable selection
+                              heuristics.
+  -l,  --list=s1+s2           stats list (default is all)
+       --index-fresh-SAT      Index ground terms in quant formulas in SAT stack
+       --index-fresh-sorts    Index ground terms in quant formulas for sort inst
+       --ccfv-ujobs-off       Turn off prevention of redundant unification jobs
+       --ccfv-breadth         Find solutions in breadth-first manner.
+       --ccfv-comps-off       Do not split (initial) constraints into
+                              components.
+       --ccfv-cnf=10^3        Limit to potential number of nodes in CNF
+       --ccfv-exp=10^6        Limit to potential number of unifiers
+       --ccfv-index=10^3      Limit to size of indexes considered in E-uni
+       --ccfv-index-full=10^2 Limit to size of indexes considered in <fx,gy>
+                              E-uni
+       --ccfv-index-inc       Use indexes up to threshold
+       --ccfv-branches=UNIT_MAX
+                              Limit max number of branches explored in
+                              backtrackable search
+       --triggers-m-inc       Use multi-triggers incrementally (if previous
+                              fail)
+       --ematch-exp=10^7      Limit to potential number of unifiers for Ematch
+                              [optimize]
+       --ematch-index=10^4    Limit to size of indexes considered in Ematch
+                              [optimize]
+       --CIs-off              Disables search for conflicting instances for
+                              active quantified formulas
+       --CIs-bound=UNIT_MAX   Limit max number of insts per round in depth-first
+                              search.
+       --inst-sorts-threshold=10^4
+                              Limit to number of sort insts per quantifier
+                              [optimize]
+       --triggers-nested      Uses old triggers but include nested ones
+                              [unstable]
+       --triggers-new         Uses new triggers (include nested ones,
+                              multi-triggers) [unstable]
+       --triggers-single-weak Uses weak multi-triggers (minimal depths)
+       --triggers-multi-weak  Uses weak multi-triggers (minimal depths)
+       --index-SIG            Index CC signature rather than ground model
+       --index-SAT-triggers   Uses ground model rather than CC signature for
+                              triggers
+       --index-sorts          Use indexed SAT stack for sort instantiation
+       --inst-deletion        Delete instances between instantiation rounds
+       --inst-deletion-loops  Prevent matching loops by forcing sort inst
+       --inst-deletion-track-vars
+                              Track vars activity rather than clauses
+       --bool-required-off    Do not prune ground model based on this superset
+                              of the prime implicant.
+       --prime-implicant-off  Do not prune ground model by computing its
+                              prime_implicant_off.
+       --prune-cnf-off        Do not prune ground model by removing CNF
+                              overhead.
+       --proof-version=(0|1|2)
+                              Proof format version
+       --proof=filename       Sets a file name to output proof (- for stdout)
+       --proof-with-sharing   Use sharing in the output proof
+       --proof-prune          Prune the proof of unused deduction
+       --proof-merge          Merge identical clauses in the proof
+       --proof-file-from-input
+                              Use filename+.proof as output file
+       --proof-stats          Output proof statistics (incompatible with actual
+                              proof output)
+       --cnf-definitional     Conjunctive normal form: Use definitional normal
+                              form (instead of p-definitional)
+  -v,  --verbose              Print statistics report on exit, ...
+  -?,  --help                 Give this help list
+       --usage                prints help message and exits
+       --version              Prints version identifier and exits
+  -i,  --input=(smtlib2|dimacs)
+                              input format (smtlib2 is default)
+  -o,  --output=(smtlib2|b|py_graph)
+                              output format (smtlib2 is default)
+       --proof-format-and-exit
+                              Print proof format on stdout and exits
+       --print-simp-and-exit  Loads formula, simplifies,and print on stdout
+                              (smt)
+       --print-flat           print formula in flattened mode (no shared
+                              subterms or formulas)
+       --disable-banner       disable printing of program banner
+       --disable-print-success
+                              cancel SMT-LIB 2 default
+       --max-time=SECONDS     Exit when time is exceeded
+
+There is a corresponding environment variable for every option.
+The names of those environment variables are the long name of options, prefixed
+by VERIT_, upcased, and with each '-' replaced by '_'.  Such a non-zero
+environment variable sets the boolean option.  For integer and string options,
+the interpretation is natural.
+Command line options override environment variables.
+
+Please notice that symbol names beginning with veriT__ or ?veriT__ are
+reserved.
+
+Report bugs to "verit-bugs@lists.gforge.inria.fr".
