@@ -91,3 +91,16 @@ Note: the call to the simplifier annoying simplifies other parts of the target a
 Also todo: hook this up to a fragment of tidy or chain, to keep trying to apply extensionality lemmas. The example above is vacuous because we can get rid of the lambdas with funext
 -/
 end tactic
+
+meta def expr.is_type : expr → bool
+| (sort zero) := ff
+-- | (sort $ level.succ l) := tt
+| (var _) := ff
+| (const _ _) := ff
+| (mvar _ _ _) := ff
+| (local_const _ _ _ _) := ff
+| (app _ _) := ff
+| (lam _ _ _ _) := ff
+| (pi _ _ _ _) := ff
+| (elet _ _ _ _) := ff
+| (macro _ _) := ff
