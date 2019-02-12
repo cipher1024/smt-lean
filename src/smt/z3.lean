@@ -1,4 +1,3 @@
-
 import smt.basic
 
 namespace smt

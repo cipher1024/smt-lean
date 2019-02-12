@@ -1,3 +1,7 @@
 *.olean
 /_target
 /leanpkg.path
+*.*~
+*.log
+.#*.*
+/src/smt/test.*
