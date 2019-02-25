@@ -242,13 +242,49 @@ end
 --   types_in_goal,
 -- end
 
-
 example : ∀ f : ℕ → ℕ, ∀ g : ℕ → ℕ → ℕ, (g $ f 0 ) 0 = (λ x y, g x y) (f 0) 0 -- ∧ ∀ p q : ℕ → Prop, ∀ r : Prop, (p 0) ↔ r ↔ ∀ r : Prop, (q 0) ↔ r
 :=
 begin
- preprocess,
+ preprocess, refl
 end
 
 example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
-begin tidy? intro_ext_cfg, end
+begin tidy? intro_ext_cfg, finish end
+
 end test
+
+-- namespace tactic
+-- set_option trace.auto.done true
+-- set_option trace.auto.finish true
+-- example : true
+-- := by finish
+
+-- -- type mismatch at application
+-- --   user_attribute.get_cache ematch
+-- -- term
+-- --   ematch
+-- -- has type
+-- --   cc_state → ematch_state → hinst_lemma → expr → tactic (list (expr × expr) × cc_state × ematch_state)
+-- -- but is expected to have type
+-- --   user_attribute ?m_1 ?m_2
+-- -- state:
+-- -- a : ¬true
+-- -- ⊢ false
+
+-- -- entering safe_core
+-- -- ⊢ true
+-- -- simplifying hypotheses
+-- -- result:
+-- -- ⊢ true
+-- -- preprocessing hypotheses
+-- -- result:
+-- -- a : ¬true
+-- -- ⊢ false
+-- -- entering done
+-- -- a : ¬true
+-- -- ⊢ false
+-- -- entering done
+-- -- a : ¬true
+-- -- ⊢ false
+
+-- end tactic
