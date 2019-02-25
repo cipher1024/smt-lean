@@ -197,8 +197,42 @@ meta def types_in_goal : tactic unit :=
 
 end type_scraper
 
+section instantiation
+-- /-- A hypothesis can be applied if its type is a Pi-expr -/
+meta def can_be_applied (e : expr) : tactic bool :=
+ (infer_type e) >>= return ∘ is_pi 
+
+meta def can_be_applied_list : tactic (list expr) :=
+local_context >>= list.mfilter can_be_applied
+
+
+-- use can_be_applied to filter the local context
+-- then, for each remaining thing in the local context, filter the local context
+-- according to whether or not the type of a term unifies with the domain
+
+#check tactic.mk_app
+
+-- use pose (FRESH_NAME) (mk_app ... )
+
+
+-- meta def can_be_applied_at (d : expr) (e : expr) : tactic bool :=
+--   (infer_type e) >>= (λ x, unify d x)
+
+meta def get_domain : expr → tactic expr
+| (pi a b c d) := return c
+| e := failed
+
+meta def mk_applications (h : expr) : tactic unit :=
+do dom <- get_domain h,
+  
+end instantiation
+
 section preprocessor -- TODO
--- intended behavior: user calls it once and it attempts to perform rudimentary preprocessing and lambda-lifting. It fails if, at the end, the goal contains lambdas or pis. It will also attempt to instantiate quantifications over types in the assumptions if they are introduced.
+/- Intended behavior: user calls it once and it attempts to perform rudimentary
+  preprocessing and lambda-lifting.
+  It fails if, at the end, the goal contains lambdas or quantifications over types.
+  It will also attempt to instantiate quantifications over types in the assumptions
+  if they are introduced. -/
 
 meta def preprocess : tactic unit :=
 do tgt                <- target,
