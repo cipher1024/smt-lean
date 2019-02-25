@@ -72,6 +72,8 @@ end is_first_order
 
 section lambda_lifting
 
+declare_trace lambda_set
+
 /-- Given an expr f of the form λ x, body and an expr e, return the expr
     ∀ x, e x = body -/
 protected meta def axiom_of_lambda (e : expr) : expr → tactic expr
@@ -93,30 +95,24 @@ protected meta def lambda_set_core (a h : name) (v : expr) : tactic unit :=
 do -- tp <- infer_type v,
    nv ← pose a none v,
    e <- (tactic.axiom_of_lambda nv v),
-   trace e,
+   when_tracing `labda_set $ trace $ "new axiom is: " ++ (to_string e),
    axm ← (tactic.axiom_of_lambda nv v) >>= assert h,
-   (intros >> tactic.interactive.refl) >> tactic.trace "intro + refl succeeded" <|> tactic.fail "intro + refl failed",
+   (intros >> tactic.interactive.refl) >> (when_tracing `lambda_set $ tactic.trace "intro + refl succeeded") <|> (when_tracing `lambda_set $ tactic.trace "intro + refl failed") <|> tactic.failed,
    pf ← to_expr ``(%%v = %%nv) >>= assert (h.append "_rw"),
    reflexivity,
      rw ← return pf,
-     -- trace pf,
+     when_tracing `lambda_set $ trace $ "new equality proof: " ++ (to_string pf),
      s ← simp_lemmas.mk.add rw,
-     -- trace "ajshdkh",
+     when_tracing `lambda_set $ trace $ "simp lemmas created successfully",
      h::hs ← list.filter (λ e, e ≠ pf) <$> non_dep_prop_hyps,
-     -- trace "RAMALAMADINGDONG",
+     when_tracing `lambda_set $ trace $ "hypotheses filtered successfully",
      tgt <- target,
-     -- trace tgt,
-     -- trace h,
-     -- tactic.dsimp_target s []
-     -- hyps.mmap (λ h, simp_hyp s [] h),
+     when_tracing `lambda_set $ trace $ "target is now: " ++ (to_string tgt),
      target >>= pp >>=
-       (λ x, (trace $ string.append "target before simp call is \n ⊢ " (to_string (x)))),
+       (λ x, (when_tracing `lambda_set $ trace $ string.append "target before simp call is \n ⊢ " (to_string (x)))),
      tactic.try $ interactive.simp_core_aux {eta := ff, beta := ff} (tactic.failed) s [] [h] tt,
      target >>= pp >>=
-       (λ x, (trace $ string.append "target after simp call is \n ⊢ " (to_string (x))))
-
-#print notation >>
-#print notation <|>
+       (λ x, (when_tracing `lambda_set $ trace $ string.append "target after simp call is \n ⊢ " (to_string (x))))
 
 meta def skip_if_lambda_free : tactic unit :=
 is_lambda_free >>=
@@ -139,8 +135,8 @@ meta def lambda_set : expr → tactic unit
                     do n <- (tactic.get_unused_name "HEWWO"),
                        n' <- (tactic.get_unused_name "HERRO"),
                        l <- pp (lam a b c d),
-                        tactic.trace "lambda_set_core is being called again",
-                        trace $ "it will be rewriting" ++ (to_string l),
+                        when_tracing `lambda_set $ trace "lambda_set_core is being called again",
+                        when_tracing `lambda_set $ trace $ "rewrite target: " ++ (to_string l),
                         tactic.lambda_set_core n n' (lam a b c d))
   | (pi a b c d) := -- tidy intro_ext_cfg >> trace "tidy was called'" >>  target >>= lambda_set <|> fail_if_no_goals
                     -- >>  
@@ -202,29 +198,37 @@ section instantiation
 meta def can_be_applied (e : expr) : tactic bool :=
  (infer_type e) >>= return ∘ is_pi 
 
-meta def can_be_applied_list : tactic (list expr) :=
-local_context >>= list.mfilter can_be_applied
-
-
--- use can_be_applied to filter the local context
--- then, for each remaining thing in the local context, filter the local context
--- according to whether or not the type of a term unifies with the domain
-
-#check tactic.mk_app
-
--- use pose (FRESH_NAME) (mk_app ... )
-
-
--- meta def can_be_applied_at (d : expr) (e : expr) : tactic bool :=
---   (infer_type e) >>= (λ x, unify d x)
-
+/- Given the type of a function, get the type of the domain -/
 meta def get_domain : expr → tactic expr
 | (pi a b c d) := return c
 | e := failed
 
-meta def mk_applications (h : expr) : tactic unit :=
-do dom <- get_domain h,
-  
+/- To infer the type of the domain of a given function e, use
+infer_type e >>= get_domain
+-/
+
+-- meta def pose_with_unused_name (n : name := `_x) (e : expr) : tactic unit :=
+-- try $ get_unused_name n >>= λ x, pose (x) none e
+
+-- meta def appl_test : tactic unit :=
+-- do (h::(h'::hs)) <- local_context,
+--    get_unused_name "hewwo" >>= λ n, pose n none (app h h'), skip
+
+meta def mk_appl_core (e₁ e₂ : expr) : tactic unit :=
+do
+   t <- infer_type e₁ >>= get_domain,
+   (do infer_type e₂ >>= λ x, unify t x,
+   e <- let e_app := (app e₁ e₂) in (to_expr ``(%%e_app)),
+   get_unused_name ((to_string e₁)++(to_string e₂)) >>=
+    λ n,  pose n none e, skip) <|> skip
+
+meta def mk_appls : tactic unit :=
+do ctx <- (local_context >>= λ l, l.mfilter can_be_applied),
+   ctx.mmap (λ e₁, tactic.try $
+            (do ctx <- local_context,
+                ctx.mmap (λ e₂, mk_appl_core e₁ e₂),
+                skip)), skip
+   
 end instantiation
 
 section preprocessor -- TODO
@@ -276,6 +280,7 @@ end
 --   types_in_goal,
 -- end
 
+-- set_option trace.lambda_set true
 example : ∀ f : ℕ → ℕ, ∀ g : ℕ → ℕ → ℕ, (g $ f 0 ) 0 = (λ x y, g x y) (f 0) 0 -- ∧ ∀ p q : ℕ → Prop, ∀ r : Prop, (p 0) ↔ r ↔ ∀ r : Prop, (q 0) ↔ r
 :=
 begin
@@ -283,7 +288,26 @@ begin
 end
 
 example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
-begin tidy? intro_ext_cfg, finish end
+begin tidy intro_ext_cfg, finish end
+
+example : true :=
+begin
+  let f := λ y : ℕ, y + 1,
+  let x := (1 : ℕ),
+  mk_appls, mk_appls, mk_appls, trivial
+
+-- IT LIVES!!!
+-- f : ℕ → ℕ := λ (y : ℕ), y + 1,
+-- x : ℕ := 1,
+-- f.x : ℕ := f x,
+-- f.x_1 : ℕ := f x,
+-- f.f.x : ℕ := f f.x,
+-- f.x_2 : ℕ := f x,
+-- f.f.x_1 : ℕ := f f.x,
+-- f.f.x_1_1 : ℕ := f f.x_1,
+-- f.f.f.x : ℕ := f f.«f.x»
+-- ⊢ true
+end
 
 end test
 
