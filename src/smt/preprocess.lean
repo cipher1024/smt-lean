@@ -1,4 +1,4 @@
-import tactic.finish tactic.tidy
+import tactic.finish tactic.tidy tactic.explode
 
 section hewwo
 
@@ -264,10 +264,12 @@ open tactic
 --  tidy? intro_ext_cfg, is_first_order_goal_trace
 -- end
 
-example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
+lemma hewwo : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
 begin
   lambda_set_tactic, finish
 end
+
+-- #explode hewwo
 
 -- example : (λ x : ℕ, x) = (λ x, id x) :=
 -- begin
