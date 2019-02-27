@@ -32,18 +32,33 @@ meta def intro_ext_cfg : tidy.cfg := {tactics := intro_ext_tactics}
 end intro_ext
 
 section is_first_order
+open level
+
+meta def is_type : expr → bool
+| (sort zero) := ff
+| (sort (max l₁ l₂)) := tt
+| (sort (succ l)) := tt
+| (sort (param n)) := tt
+| (sort (mvar n)) := tt
+| e := ff
+
+-- | succ   : level → level
+-- | max    : level → level → level
+-- | imax   : level → level → level
+-- | param  : name → level
+-- | mvar   : name → level
 
 /- Checks if an an expr contains a quantification over types -/
 meta def contains_type_variables : expr → bool
-  | (lam a b c d) := is_sort c ∨ contains_type_variables d
+  | (lam a b c d) := is_type c ∨ contains_type_variables d
   | (var n) := ff
   | (sort l) := ff
   | (const a b) := ff
   | (mvar a b c) := contains_type_variables c
   | (local_const a b c d) := contains_type_variables d
   | (app a b) := contains_type_variables a ∨ contains_type_variables b
-  | (pi a b c d) := is_sort c ∨ contains_type_variables d
-  | (elet a b c d) := is_sort c ∨ contains_type_variables b ∨ contains_type_variables d
+  | (pi a b c d) := is_type c ∨ contains_type_variables d
+  | (elet a b c d) := is_type c ∨ contains_type_variables b ∨ contains_type_variables d
   | (macro a b) := (b.map contains_type_variables).foldr (λ x y, x ∨ y) ff
 
 meta def contains_lambda : expr → bool
@@ -196,7 +211,9 @@ end type_scraper
 section instantiation
 -- /-- A hypothesis can be applied if its type is a Pi-expr -/
 meta def can_be_applied (e : expr) : tactic bool :=
- (infer_type e) >>= return ∘ is_pi 
+ (infer_type e) >>= whnf >>= return ∘ is_pi 
+
+
 
 /- Given the type of a function, get the type of the domain -/
 meta def get_domain : expr → tactic expr
@@ -216,18 +233,45 @@ infer_type e >>= get_domain
 
 meta def mk_appl_core (e₁ e₂ : expr) : tactic unit :=
 do
-   t <- infer_type e₁ >>= get_domain,
+   t <- infer_type e₁ >>= whnf >>= get_domain,
    (do infer_type e₂ >>= λ x, unify t x,
-   e <- let e_app := (app e₁ e₂) in (to_expr ``(%%e_app)),
+   -- e <- let e_app :=  in (to_expr ``(%%e_app)),
    get_unused_name ((to_string e₁)++(to_string e₂)) >>=
-    λ n,  pose n none e, skip) <|> skip
+    λ n,  pose n none (app e₁ e₂), skip) <|> skip
+
+meta def mk_appl_type_core (e₁ e₂ : expr) : tactic unit :=
+do
+   t <- infer_type e₁ >>= whnf >>= get_domain,
+   (do infer_type e₂ >>= λ x, unify t x,
+   -- e <- let e_app :=  in (to_expr ``(%%e_app)),
+   get_unused_name ((to_string e₁)++(to_string e₂)) >>=
+    λ n,  note n none (app e₁ e₂), skip) <|> skip
+
+#check interactive.specialize
 
 meta def mk_appls : tactic unit :=
-do ctx <- (local_context >>= λ l, l.mfilter can_be_applied),
-   ctx.mmap (λ e₁, tactic.try $
-            (do ctx <- local_context,
-                ctx.mmap (λ e₂, mk_appl_core e₁ e₂),
-                skip)), skip
+do ls <- local_context,
+   fs ← ls.mfilter can_be_applied,
+   fs.mmap' (λ e₁, 
+            try $ ls.mmap' (λ e₂, mk_appl_core e₁ e₂))
+
+meta def mk_appls_type_variables (inst_list : list expr) : tactic unit :=
+do ls <- local_context >>= λ x, return (x ++ inst_list),
+   fs ← ls.mfilter (λ x, do b₁ <- can_be_applied x,
+                      if b₁
+                      then ((do t <- infer_type x, d <- get_domain t,
+                                return (is_type d)) <|> return ff)
+                      else return b₁),
+   if fs = [] then failed else skip,
+   fs.mmap' (λ e₁,  try $ ls.mmap' (λ e₂, mk_appl_type_core e₁ e₂)) >>
+   fs.mmap' (λ e, try (clear e))
+
+
+-- meta def mk_bad_appls : tactic unit :=
+-- do ctx <- (local_context >>= λ l, l.mfilter can_be_applied),
+--    ctx.mmap' (λ e₁, tactic.try $
+--             (do ctx <- local_context,
+--                 ctx.mmap' (λ e₂, mk_appl_core e₁ e₂)))
    
 end instantiation
 
@@ -276,7 +320,6 @@ end
 --  ext
 -- end
 
-
 -- example : ∀ p : Prop, ∀ q : Prop, p ∧ q ↔ q ∧ p  :=
 -- begin
 --   types_in_goal,
@@ -289,26 +332,46 @@ begin
  preprocess, refl
 end
 
-example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
+example : ∀ α : Type, true ∧ (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
 begin tidy intro_ext_cfg, finish end
 
-example : true :=
+example : (∀ α : Type, true) ∧ true :=
 begin
   let f := λ y : ℕ, y + 1,
   let x := (1 : ℕ),
-  mk_appls, mk_appls, mk_appls, trivial
+  let N := ℕ,
+  mk_appls, mk_appls, mk_appls,
+  do {b <- is_first_order_goal,
+    guard b},
+end
 
--- IT LIVES!!!
--- f : ℕ → ℕ := λ (y : ℕ), y + 1,
--- x : ℕ := 1,
--- f.x : ℕ := f x,
--- f.x_1 : ℕ := f x,
--- f.f.x : ℕ := f f.x,
--- f.x_2 : ℕ := f x,
--- f.f.x_1 : ℕ := f f.x,
--- f.f.x_1_1 : ℕ := f f.x_1,
--- f.f.f.x : ℕ := f f.«f.x»
--- ⊢ true
+example (F : Type → Type → ℕ) (α : Type) (G : Prop → Type) (q : Prop) (f : ℕ → ℕ) (k : ℕ) : unit :=
+begin
+/-
+F : Type → ℕ,
+α : Type,
+G : Prop → Type,
+q : Prop,
+f : ℕ → ℕ,
+k : ℕ
+⊢ unit
+-/
+mk_appls_type_variables [],
+/-
+α : Type,
+G : Prop → Type,
+q : Prop,
+f : ℕ → ℕ,
+k F.α : ℕ
+⊢ unit
+-/
+mk_appls_type_variables [],-- equivalent to repeat{mk_appls_type_variables []},
+-- α : Type,
+-- G : Prop → Type,
+-- q : Prop,
+-- f : ℕ → ℕ,
+-- k F.α.α : ℕ
+-- ⊢ unit
 end
 
 end test
