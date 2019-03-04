@@ -1,12 +1,8 @@
 import tactic.finish tactic.tidy tactic.explode
 
-section hewwo
-
-end hewwo
-
-
-open expr
 namespace tactic
+open expr tactic.interactive
+
 section intro_ext
 
 meta def intro_ext_tactics : list (tactic string) :=
@@ -27,8 +23,6 @@ meta def intro_ext_tactics : list (tactic string) :=
 
 meta def intro_ext_cfg : tidy.cfg := {tactics := intro_ext_tactics}
 
-
-
 end intro_ext
 
 section is_first_order
@@ -41,12 +35,6 @@ meta def is_type : expr → bool
 | (sort (param n)) := tt
 | (sort (mvar n)) := tt
 | e := ff
-
--- | succ   : level → level
--- | max    : level → level → level
--- | imax   : level → level → level
--- | param  : name → level
--- | mvar   : name → level
 
 /- Checks if an an expr contains a quantification over types -/
 meta def contains_type_variables : expr → bool
@@ -81,8 +69,6 @@ meta def is_first_order_goal : tactic bool := target >>= (λ e, (return $ is_fir
 
 meta def is_first_order_goal_trace : tactic unit := is_first_order_goal >>= tactic.trace
 
-
-
 end is_first_order
 
 section lambda_lifting
@@ -106,28 +92,35 @@ protected meta def axiom_of_lambda (e : expr) : expr → tactic expr
 meta def trace_goal_raw : tactic unit :=
   target >>= tactic.trace ∘ to_raw_fmt
 
-protected meta def lambda_set_core (a h : name) (v : expr) : tactic unit :=
-do -- tp <- infer_type v,
-   nv ← pose a none v,
-   e <- (tactic.axiom_of_lambda nv v),
-   when_tracing `labda_set $ trace $ "new axiom is: " ++ (to_string e),
-   axm ← (tactic.axiom_of_lambda nv v) >>= assert h,
-   (intros >> tactic.interactive.refl) >> (when_tracing `lambda_set $ tactic.trace "intro + refl succeeded") <|> (when_tracing `lambda_set $ tactic.trace "intro + refl failed") <|> tactic.failed,
-   pf ← to_expr ``(%%v = %%nv) >>= assert (h.append "_rw"),
-   reflexivity,
-     rw ← return pf,
-     when_tracing `lambda_set $ trace $ "new equality proof: " ++ (to_string pf),
-     s ← simp_lemmas.mk.add rw,
-     when_tracing `lambda_set $ trace $ "simp lemmas created successfully",
-     h::hs ← list.filter (λ e, e ≠ pf) <$> non_dep_prop_hyps,
-     when_tracing `lambda_set $ trace $ "hypotheses filtered successfully",
-     tgt <- target,
-     when_tracing `lambda_set $ trace $ "target is now: " ++ (to_string tgt),
-     target >>= pp >>=
-       (λ x, (when_tracing `lambda_set $ trace $ string.append "target before simp call is \n ⊢ " (to_string (x)))),
-     tactic.try $ interactive.simp_core_aux {eta := ff, beta := ff} (tactic.failed) s [] [h] tt,
-     target >>= pp >>=
-       (λ x, (when_tracing `lambda_set $ trace $ string.append "target after simp call is \n ⊢ " (to_string (x))))
+protected meta def lambda_set_core' (a h : name) (v : expr) : tactic unit :=
+-- do tactic.interactive.generalize h ":"
+  do (e₁, e₂) <- generalize' h v a,
+     h' <- get_local h,
+     replace h ``(congr_fun %%h')
+
+-- protected meta def lambda_set_core (a h : name) (v : expr) : tactic unit :=
+-- do -- tp <- infer_type v,
+--    nv ← pose a none v,
+--    e <- (tactic.axiom_of_lambda nv v),
+--    when_tracing `labda_set $ trace $ "new axiom is: " ++ (to_string e),
+--    axm ← (tactic.axiom_of_lambda nv v) >>= assert h,
+--    (intros >> tactic.interactive.refl) >> (when_tracing `lambda_set $ tactic.trace "intro + refl succeeded") <|> (when_tracing `lambda_set $ tactic.trace "intro + refl failed") <|> tactic.failed,
+--    -- `[generalize : v = a]
+--    pf ← to_expr ``(%%v = %%nv) >>= assert (h.append "_rw"),
+--    reflexivity,
+--      rw ← return pf,
+--      when_tracing `lambda_set $ trace $ "new equality proof: " ++ (to_string pf),
+--      s ← simp_lemmas.mk.add rw,
+--      when_tracing `lambda_set $ trace $ "simp lemmas created successfully",
+--      h::hs ← list.filter (λ e, e ≠ pf) <$> non_dep_prop_hyps,
+--      when_tracing `lambda_set $ trace $ "hypotheses filtered successfully",
+--      tgt <- target,
+--      when_tracing `lambda_set $ trace $ "target is now: " ++ (to_string tgt),
+--      target >>= pp >>=
+--        (λ x, (when_tracing `lambda_set $ trace $ string.append "target before simp call is \n ⊢ " (to_string (x)))),
+--      tactic.try $ interactive.simp_core_aux {eta := ff, beta := ff} (tactic.failed) s [] [h] tt,
+--      target >>= pp >>=
+--        (λ x, (when_tracing `lambda_set $ trace $ string.append "target after simp call is \n ⊢ " (to_string (x))))
 
 meta def skip_if_lambda_free : tactic unit :=
 is_lambda_free >>=
@@ -140,19 +133,15 @@ meta def lambda_set : expr → tactic unit
   | (mvar a b c) := lambda_set c
   | (local_const a b c d) := lambda_set d 
   | (app a b) := lambda_set a >> lambda_set b
-  /- Upon encountering a lambda, attempts to call tidy with only intro and ext to remove it
-     from the goal, and then calls 'lambda_set' on the target again.
-     If tidy fails, then if the goal is lambda-free, the tactic's job is done.
-     If the goal is not lambda free, then lambda_set_core is called to perform lambda-lifting. -/
-  | (lam a b c d) := (tidy intro_ext_cfg >>
-  ((skip_if_lambda_free) <|> target >>= lambda_set)) <|>
+  | (lam a b c d) := -- (tidy intro_ext_cfg >>
+  -- ((skip_if_lambda_free) <|> target >>= lambda_set)) <|>
                     (skip_if_lambda_free <|>
-                    do n <- (tactic.get_unused_name "HEWWO"),
-                       n' <- (tactic.get_unused_name "HERRO"),
+                    do n <- (tactic.get_unused_name "f"),
+                       n' <- (tactic.get_unused_name "h_f"),
                        l <- pp (lam a b c d),
                         when_tracing `lambda_set $ trace "lambda_set_core is being called again",
                         when_tracing `lambda_set $ trace $ "rewrite target: " ++ (to_string l),
-                        tactic.lambda_set_core n n' (lam a b c d))
+                        tactic.lambda_set_core' n n' (lam a b c d))
   | (pi a b c d) := -- tidy intro_ext_cfg >> trace "tidy was called'" >>  target >>= lambda_set <|> fail_if_no_goals
                     -- >>  
                     lambda_set c >> lambda_set d
@@ -169,12 +158,6 @@ meta def trace_intro : tactic unit :=
   tactic.trace e.to_raw_fmt
 
 meta def lambda_set_tactic : tactic unit := target >>= lambda_set
-
-/-
-Note: the call to the simplifier annoyingly simplifies other parts of the target along with the intended rewrite. Possible fix: using rw instead of simp? Or use expr.replace and then change?
-
-In case we have assumptions with universal quantifications over types, we should also populate a list with all types which occur in the initial goal, plus types relevant to the target logic, with which to instantiate such quantifications
--/
 
 end lambda_lifting
 
@@ -213,23 +196,10 @@ section instantiation
 meta def can_be_applied (e : expr) : tactic bool :=
  (infer_type e) >>= whnf >>= return ∘ is_pi 
 
-
-
 /- Given the type of a function, get the type of the domain -/
 meta def get_domain : expr → tactic expr
 | (pi a b c d) := return c
 | e := failed
-
-/- To infer the type of the domain of a given function e, use
-infer_type e >>= get_domain
--/
-
--- meta def pose_with_unused_name (n : name := `_x) (e : expr) : tactic unit :=
--- try $ get_unused_name n >>= λ x, pose (x) none e
-
--- meta def appl_test : tactic unit :=
--- do (h::(h'::hs)) <- local_context,
---    get_unused_name "hewwo" >>= λ n, pose n none (app h h'), skip
 
 meta def mk_appl_core (e₁ e₂ : expr) : tactic unit :=
 do
@@ -247,7 +217,10 @@ do
    get_unused_name ((to_string e₁)++(to_string e₂)) >>=
     λ n,  note n none (app e₁ e₂), skip) <|> skip
 
-#check interactive.specialize
+meta def mk_appl_type_core_flag (e₁ : expr) (l : list expr) : tactic bool :=
+l.mfoldl (λ (b : bool) e₂,
+           do b' <- (mk_appl_type_core e₁ e₂ >> return tt <|> return ff),
+             return $ bor b b') ff
 
 meta def mk_appls : tactic unit :=
 do ls <- local_context,
@@ -266,13 +239,29 @@ do ls <- local_context >>= λ x, return (x ++ inst_list),
    fs.mmap' (λ e₁,  try $ ls.mmap' (λ e₂, mk_appl_type_core e₁ e₂)) >>
    fs.mmap' (λ e, try (clear e))
 
+/-- this version of mk_apples_type_variables filters fs for successful applications
+    and only clear successful applications -/
+meta def mk_appls_type_variables' (inst_list : list expr) : tactic unit :=
+do ls <- local_context >>= λ x, return (x ++ inst_list),
+   fs ← ls.mfilter (λ x, do b₁ <- can_be_applied x,
+                      if b₁
+                      then ((do t <- infer_type x, d <- get_domain t,
+                                return (is_type d)) <|> return ff)
+                      else return b₁),
+   if fs = [] then failed else skip,
+   clear_list <- fs.mfilter (λ e, mk_appl_type_core_flag e ls),
+   clear_list.mmap' $ try ∘ clear
 
--- meta def mk_bad_appls : tactic unit :=
--- do ctx <- (local_context >>= λ l, l.mfilter can_be_applied),
---    ctx.mmap' (λ e₁, tactic.try $
---             (do ctx <- local_context,
---                 ctx.mmap' (λ e₂, mk_appl_core e₁ e₂)))
-   
+meta def clear_type_quantifications : tactic unit :=
+  do ls <- local_context,
+     fs ← ls.mfilter (λ x, do b₁ <- can_be_applied x,
+                        if b₁
+                        then ((do t <- infer_type x, d <- get_domain t,
+                                  return (is_type d)) <|> return ff)
+                        else return b₁),
+     if fs = [] then failed else skip,
+     fs.mmap'(λ e, try (clear e))
+
 end instantiation
 
 section preprocessor -- TODO
@@ -283,14 +272,14 @@ section preprocessor -- TODO
   if they are introduced. -/
 
 meta def preprocess : tactic unit :=
-do tgt                <- target,
-   instantiation_list <- types_in_expr tgt
-    -- trace instantiation_list
-   >> lambda_set_tactic,
+do tidy intro_ext_cfg,
+   tgt                <- target,
+   instantiation_list <- types_in_expr tgt,
+   lambda_set_tactic,
+   repeat $ mk_appls_type_variables' instantiation_list,
+   try $ clear_type_quantifications,
    do first_order_goal_flag <- is_first_order_goal,
       if first_order_goal_flag then return () else tactic.fail "Preprocessing failed, target is not first-order"
-
--- TODO perform instantiations using congr_fun after applying extensionality lemmas
 
 end preprocessor
 end tactic
@@ -305,52 +294,36 @@ begin
   finish
 end
 
-example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
-begin
-  lambda_set_tactic
-end
-
--- example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
--- begin
---  tidy? intro_ext_cfg, is_first_order_goal_trace
--- end
-
 lemma hewwo : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
 begin
-  lambda_set_tactic, finish
+  lambda_set_tactic, ext, finish
 end
 
--- #explode hewwo
-
--- example : (λ x : ℕ, x) = (λ x, id x) :=
--- begin
---  ext
--- end
-
--- example : ∀ p : Prop, ∀ q : Prop, p ∧ q ↔ q ∧ p  :=
--- begin
---   types_in_goal,
--- end
+example : ∀ p : Prop, ∀ q : Prop, p ∧ q ↔ q ∧ p  :=
+begin
+  -- types_in_goal,
+cc
+end
 
 -- set_option trace.lambda_set true
 example : ∀ f : ℕ → ℕ, ∀ g : ℕ → ℕ → ℕ, (g $ f 0 ) 0 = (λ x y, g x y) (f 0) 0 -- ∧ ∀ p q : ℕ → Prop, ∀ r : Prop, (p 0) ↔ r ↔ ∀ r : Prop, (q 0) ↔ r
 :=
 begin
- preprocess, refl
+ preprocess, finish
 end
 
 example : ∀ α : Type, true ∧ (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
 begin tidy intro_ext_cfg, finish end
 
-example : (∀ α : Type, true) ∧ true :=
-begin
-  let f := λ y : ℕ, y + 1,
-  let x := (1 : ℕ),
-  let N := ℕ,
-  mk_appls, mk_appls, mk_appls,
-  do {b <- is_first_order_goal,
-    guard b},
-end
+-- example : (∀ α : Type, true) ∧ true :=
+-- begin
+--   let f := λ y : ℕ, y + 1,
+--   let x := (1 : ℕ),
+--   let N := ℕ,
+--   mk_appls, mk_appls, mk_appls,
+--   do {b <- is_first_order_goal,
+--     guard b},
+-- end
 
 example (F : Type → Type → ℕ) (α : Type) (G : Prop → Type) (q : Prop) (f : ℕ → ℕ) (k : ℕ) : unit :=
 begin
@@ -363,7 +336,7 @@ f : ℕ → ℕ,
 k : ℕ
 ⊢ unit
 -/
-mk_appls_type_variables [],
+mk_appls_type_variables' [],
 /-
 α : Type,
 G : Prop → Type,
@@ -372,7 +345,8 @@ f : ℕ → ℕ,
 k F.α : ℕ
 ⊢ unit
 -/
-mk_appls_type_variables [],-- equivalent to repeat{mk_appls_type_variables []},
+mk_appls_type_variables' [],-- equivalent to repeat{mk_appls_type_variables []},
+exact ()
 -- α : Type,
 -- G : Prop → Type,
 -- q : Prop,
@@ -382,39 +356,3 @@ mk_appls_type_variables [],-- equivalent to repeat{mk_appls_type_variables []},
 end
 
 end test
-
--- namespace tactic
--- set_option trace.auto.done true
--- set_option trace.auto.finish true
--- example : true
--- := by finish
-
--- -- type mismatch at application
--- --   user_attribute.get_cache ematch
--- -- term
--- --   ematch
--- -- has type
--- --   cc_state → ematch_state → hinst_lemma → expr → tactic (list (expr × expr) × cc_state × ematch_state)
--- -- but is expected to have type
--- --   user_attribute ?m_1 ?m_2
--- -- state:
--- -- a : ¬true
--- -- ⊢ false
-
--- -- entering safe_core
--- -- ⊢ true
--- -- simplifying hypotheses
--- -- result:
--- -- ⊢ true
--- -- preprocessing hypotheses
--- -- result:
--- -- a : ¬true
--- -- ⊢ false
--- -- entering done
--- -- a : ¬true
--- -- ⊢ false
--- -- entering done
--- -- a : ¬true
--- -- ⊢ false
-
--- end tactic
