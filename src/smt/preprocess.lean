@@ -215,7 +215,7 @@ do
    (do infer_type e₂ >>= λ x, unify t x,
    -- e <- let e_app :=  in (to_expr ``(%%e_app)),
    get_unused_name ((to_string e₁)++(to_string e₂)) >>=
-    λ n,  note n none (app e₁ e₂), skip) <|> skip
+    λ n,  note n none (app e₁ e₂), skip) <|> failed
 
 meta def mk_appl_type_core_flag (e₁ : expr) (l : list expr) : tactic bool :=
 l.mfoldl (λ (b : bool) e₂,
