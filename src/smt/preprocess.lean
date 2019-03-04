@@ -298,10 +298,17 @@ end tactic
 section test
 open tactic
 
--- example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
--- begin
---  tidy? intro_ext_cfg,
--- end
+example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
+begin
+  generalize h : (λ x : ℕ, x + 1) = g,
+  generalize h' : (λ x : ℕ, 0 + x + 0 + 1) = g',
+  finish
+end
+
+example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
+begin
+  lambda_set_tactic
+end
 
 -- example : (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
 -- begin
