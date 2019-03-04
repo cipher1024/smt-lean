@@ -1,4 +1,4 @@
-import tactic.finish tactic.tidy tactic.explode
+import tactic.finish tactic.tidy tactic.explode tactic.basic
 
 namespace tactic
 open expr tactic.interactive
@@ -218,9 +218,7 @@ do
     λ n,  note n none (app e₁ e₂), skip) <|> failed
 
 meta def mk_appl_type_core_flag (e₁ : expr) (l : list expr) : tactic bool :=
-l.mfoldl (λ (b : bool) e₂,
-           do b' <- (mk_appl_type_core e₁ e₂ >> return tt <|> return ff),
-             return $ bor b b') ff
+  list.bor <$> l.mmap (succeeds ∘ λ e₂, mk_appl_type_core e₁ e₂)
 
 meta def mk_appls : tactic unit :=
 do ls <- local_context,
@@ -309,7 +307,7 @@ end
 example : ∀ f : ℕ → ℕ, ∀ g : ℕ → ℕ → ℕ, (g $ f 0 ) 0 = (λ x y, g x y) (f 0) 0 -- ∧ ∀ p q : ℕ → Prop, ∀ r : Prop, (p 0) ↔ r ↔ ∀ r : Prop, (q 0) ↔ r
 :=
 begin
- preprocess, finish
+ preprocess, solve_by_elim
 end
 
 example : ∀ α : Type, true ∧ (λ x : ℕ, x + 1) = λ x, 0 + x + 0 + 1  :=
