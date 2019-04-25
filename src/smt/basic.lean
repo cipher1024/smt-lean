@@ -127,6 +127,7 @@ meta def type.to_z3 : _root_.expr → string ⊕ type
 meta def z3_builtin : rbmap name (ℕ × name) :=
 rbmap.from_list
 [ (`eq, 1, `=),
+  (`has_lt.lt, 1, `<),
   (`has_add.add, 2, `+),
   (`has_mul.mul, 2, `*),
   (`has_sub.sub, 2, `-),
@@ -374,6 +375,7 @@ meta def expr.of_sexpr : sexpr → tactic expr
 | (fapp (const (sym "and") :: xs))   := xs.mmap expr.of_sexpr >>= mk_assoc ``_root_.and
 | (fapp (const (sym "=") :: [x,y]))  := [x,y].mmap expr.of_sexpr >>= mk_app ``eq
 | (fapp (const (sym "<=") :: [x,y])) := [x,y].mmap expr.of_sexpr >>= mk_app ``has_le.le
+| (fapp (const (sym "<") :: [x,y])) := [x,y].mmap expr.of_sexpr >>= mk_app ``has_lt.lt
 | e@(fapp _) := fail format!"fapp {e.to_string}"
 
 
