@@ -40,6 +40,7 @@ inductive proof_step
 --  * right_assoc_elim  : valid: {(= (f t1 ... tn ) (f t1 (f t2 ... (f tn−1 tn ) ... )}
 --  * left_assoc_elim   : valid: {(= (f t1 ... tn ) (f ... (f (f t1 t2 ) t3 ) ... tn )}
 --  * la_rw_eq          : valid: {(= (a = b) (and (a <= b) (b <= a))}
+| la_generic (_ : list sexpr)
 --  * la_generic        : valid: not yet defined
 --  * lia_generic       : valid: not yet defined
 --  * nla_generic       : valid: not yet defined
