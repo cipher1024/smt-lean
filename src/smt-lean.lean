@@ -130,7 +130,7 @@ do p ← tactic.unsafe_run_io $ io.fs.read_file fn,
 meta def unique_file_name (logic : logic_fragment) (prover : solver) (ext : string) : tactic string :=
 do h ← hash_context,
    let h' := @hash_with_salt _ (prod.hashable _ _) (prover,logic) h,
-   pure $ "proof_witness_" ++ to_string () ++ "." ++ ext
+   pure $ "proof_witness_" ++ to_string (h') ++ "." ++ ext
 
 meta def write_formulas (logic : logic_fragment) (prover : solver) (xs : list string) (h : handle) : io unit :=
 do let opts := prover.options ++ [
@@ -188,6 +188,9 @@ do by_contradiction none,
    trace fn,
    ls ← local_context,
    ps ← ls.mmap encode_local,
+   unsafe_run_io $ do {
+     h ← io.mk_file_handle fn mode.write,
+     io.fs.write h "".to_char_buffer },
    fn ← call_solver logic prover fn ps,
    p ← parse_log fn prover,
    prover.execute p,
