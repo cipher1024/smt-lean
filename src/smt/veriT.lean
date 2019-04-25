@@ -224,11 +224,10 @@ meta def run_step (m : rb_map ℕ expr) : ℕ × proof_step → tactic (rb_map �
   tautology tt,
   pure m
 | (i, la_generic es) := do
-  es.mmap' $ λ e, do { e' ← expr.of_sexpr e,
-                       h ← assert `h e',
-                       -- clear_except [],
-                       pure $ m.insert i h},
-  pure m
+  e' ← mmap expr.of_sexpr es,
+  let p := mk_conj e',
+  h ← assert `h p, linarith [] none,
+  pure $ m.insert i h
 
 end smt.veriT
 
